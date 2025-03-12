@@ -1,0 +1,157 @@
+---
+title: "SAE modéle linéaire"
+output: word_document
+date: "2025-02-25"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+dataset = read.csv2("C:/Users/BUNICE/OneDrive - Université Côte d'Azur/Bureau/Semestre 4/Cours Modèle Linéaire/Projet Groupe/simplifiedAmesHousing.csv",stringsAsFactors = TRUE, header = TRUE,sep=";",dec=".")
+str(dataset)
+summary(dataset)
+```
+
+## Import des library
+```{r}
+library(ggplot2)
+library(dplyr)
+library(car)
+```
+
+## Quelques visualisations et interprétations
+```{r}
+hist(dataset$Lot.Area, 
+     main = "Répartition des tailles de maisons",
+     xlab = "Surface du terrain (Lot.Area)",
+     ylab = "Fréquence",
+     col = "skyblue",
+     border = "white")#  La repartition de la taille des maisons reste homogéne mais il y'a quelques valeur 
+```
+
+```{r}
+boxplot(dataset$Lot.Area)
+# on note quelques valeurs abberantes 
+```
+## Corriger les types de variables
+```{r}
+dataset$Overall.Qual<-as.factor(dataset$Overall.Qual)# typer la variable qualité en factor
+```
+
+## Traiter les données manquantes
+```{r}
+# Compter les valeurs manquantes dans chaque colonne
+colSums(is.na(dataset))
+```
+
+
+```{r}
+# modifier les levels d'abord
+dataset$Alley<-factor(dataset$Alley,levels = c("Grvl", "Pave", "None"))
+
+dataset$Total.Bsmt.SF<-as.numeric(dataset$Total.Bsmt.SF)
+# Remplacer NA  de la colonne Alley par None car n'etant pas des Not a Nomber d'aprés le description
+dataset$Alley[is.na(dataset$Alley)] <- "None"
+summary(dataset$Alley)
+
+```
+## Utiliser la régression pour imputer les valeurs manquantes
+```{r}
+
+# Liste des colonnes contenant des NA
+cols_avec_na <- names(dataset)[colSums(is.na(dataset)) > 0]
+print(cols_avec_na)
+# indice des individus 
+for (col in cols_avec_na) { # uen boucle qui permet de d'indiquer les indices des NA
+  indice <- which(is.na(dataset[[col]]))  
+  print(indice)
+}
+# on remarque les NA proviennent de 3 individus d'indice 1342,1498 et 2237
+
+#dataset[1342,]
+
+
+dataset_sans_na =na.omit(dataset)# 
+colSums(is.na(dataset_sans_na))
+
+```
+# Matrice des corrélations
+
+```{r}
+df <- dataset_sans_na %>%
+  select_if(is.numeric)
+corrplot::corrplot(cor(df), type="upper", order="hclust", tl.col="black", method = "shade")
+```
+
+
+## boxplot de la cible en fonction de 
+
+```{r}
+plot(SalePrice~., data = dataset)
+boxplot(dataset$SalePrice~dataset$MS.Zoning,notch=TRUE)
+```
+
+# vif
+
+```{r}
+
+reg1 <- lm(SalePrice~.-Order, data = dataset_sans_na)
+summary(reg1)
+```
+```{r}
+vif(reg1)[,3]^2
+```
+```{r}
+to_be_factors <- c("Overall.Qual", "Bsmt.Full.Bath", "Bsmt.Half.Bath", "Full.Bath", 
+                   "Half.Bath", "TotRms.AbvGrd", "Garage.Cars",
+                   "Yr.Sold", "Year.Built", "Year.Remod.Add")
+
+dataset_sans_na[to_be_factors] <- lapply(dataset_sans_na[to_be_factors], factor)
+
+reg2 <- lm(SalePrice~.-Order, data = dataset_sans_na)
+vif(reg2)[, 3]^2
+```
+```{r}
+reg3 <- lm(SalePrice~.-Order-X1st.Flr.SF-X2nd.Flr.SF, data = dataset_sans_na)
+vif(reg3)[, 3]^2
+```
+```{r}
+rg <- lm(Gr.Liv.Area~.-Order-MS.Zoning-Neighborhood-Year.Built, data = dataset_sans_na)
+summary(rg, digits = Inf)
+```
+```{r}
+reg4 <- lm(SalePrice~.-Order-X1st.Flr.SF-X2nd.Flr.SF-Garage.Area-Year.Built, data = dataset_sans_na)
+vif(reg4)[, 3]^2
+summary(reg4)
+```
+```{r}
+reg5 <- lm(SalePrice~.-Order-Gr.Liv.Area, data = dataset_sans_na)
+vif(reg5)[, 3]^2
+```
+
+# Stepwise (prédictif)
+
+```{r}
+reg_wise <- MASS::stepAIC(reg4, direction = "both")
+vif(reg_wise)[,3]^2
+```  
+
+# method "exhaustive"
+
+```{r}
+reg_exhau <- leaps::regsubsets(SalePrice~., data = dataset_sans_na, method = "exhaustive", nvmax = ncol(dataset_sans_na), really.big = T) # Un souci ici
+summary(reg_exhau)
+plot(reg_exhau, scale = "bic")
+```
+
+```{r}
+reg_final <- lm(SalePrice ~ MS.Zoning + Lot.Area + Alley + Neighborhood + Overall.Qual + 
+    Year.Remod.Add + Gr.Liv.Area + Total.Bsmt.SF + Bsmt.Full.Bath + 
+    Bsmt.Half.Bath + Full.Bath + Half.Bath + TotRms.AbvGrd + 
+    Garage.Cars + Sale.Condition, data = dataset_sans_na)
+
+summary(reg_final)
+```
+
