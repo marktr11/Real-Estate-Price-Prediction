@@ -1,0 +1,115 @@
+---
+title: "TestMulticolineairite"
+author: "Binh Minh TRAN"
+date: "2025-02-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+library(dplyr)
+```
+
+```{r}
+df<-read.csv("simplifiedAmesHousing.csv",sep=";")
+str(df)
+dim(df)
+```
+
+# Nettoyer 
+Effacer les colonnes n'étant pas numérique
+
+```{r}
+subset<-df[,-c(1,2,4,5,21)]
+str(subset)
+```
+```{r}
+reg1<-lm(SalePrice~.,data = subset)
+summary(reg1)
+```
+
+Selon p-value de tous les variables, evidemment on peut voir que les variables suivantes (Gr.Liv.Area, Bsmt.Half.Bath, Half.Bath, TotRms.AbvGrd) sont moins de sens dans le modele.  Autrement dit, on peut pas rejetter l'hypothese que ces variables fournit un coefficient de pente = 0.
+
+```{r}
+vif_1<-car::vif(reg1)
+# les variable ont le vif > 3
+#(moins_sens_var1<- vif_1[vif_1>3])
+#(noms_moins_sens_var1<-names(moins_sens_var1))
+vif_1[vif_1>=3 & vif_1<5] # peut accepter
+vif_1[vif_1>=5 & vif_1<10] # influence averement le modele
+vif_1[vif_1>=10] #influence significativement le modele
+```
+
+```{r}
+step(reg1)
+```
+
+
+```{r}
+n= nrow(subset)
+step(reg1,k=log(n))
+```
+
+
+
+
+À partir de VIF, on peut savoir ....
+il est note que une variable independente a un VIF eleve ne signifie pas qu'elle est moins de sens par apport des autres variables.
+Donc, On doit tester et enlever les variables ayant des VIF eleve dem maniere grave et considere.
+Alors, on peut voir il y a un multicolinearite entre ces variables. Par example : Garage.Cars et Garage.Area car plus de cars , plus grand la surface...
+
+
+```{r}
+reg2 <- lm(Gr.Liv.Area~X1st.Flr.SF+X2nd.Flr.SF+Total.Bsmt.SF+TotRms.AbvGrd+Garage.Cars+Garage.Area , data = subset)
+summary(reg2)
+```
+```{r}
+coef_matrix <- summary(reg2)$coefficients
+significant_vars_GrLivArea <- rownames(coef_matrix)[coef_matrix[, "Pr(>|t|)"] < 0.01]
+#enlever intercept
+(significant_vars_GrLivArea<-significant_vars_GrLivArea[-1])
+```
+
+consider to analyze the variable ***
+
+```{r}
+(formula_new <- as.formula(paste("SalePrice ~ . -", paste(significant_vars_GrLivArea, collapse = " - "))))
+reg3<- lm(formula_new, data = subset)
+summary(reg3)
+```
+
+```{r}
+vif_2<-car::vif(reg3)
+# les variable ont le vif > 3
+#(moins_sens_var1<- vif_1[vif_1>3])
+#(noms_moins_sens_var1<-names(moins_sens_var1))
+vif_2[vif_2>3] # acepter 
+```
+
+```{r}
+(formula_new <- as.formula(paste("Gr.Liv.Area ~ . -SalePrice-", paste(significant_vars_GrLivArea, collapse = " - "))))
+reg4 <- lm(formula_new , data = subset)
+summary(reg4)
+```
+On peut accepter VIF > 3 de variable Gr.Liv.Area car cette variable est important pour la variable ciblee 
+Pose 2 hypothese : Model utilise Gr.Liv.Area et non Gr.Liv.Area, puis comparer dans l'etape evaluation du model.
+
+Il reste : 2 variable à considerer : Half.Bath et Bsmt.Half.Bath
+
+À partir de la regression de Gr.Liv.Area en fonction des autres predicteurs (exlus les variables multicolineaire deje enleve)
+
+Half.Bath et Bsmt.Half.Bath sont moins de sens statistique dans le modele. Bsmt.Half.Bath n'est pas trop dependent Gr.Liv.Area donc on essaie d'enlever Half.Bath ou le sens stat dans le model est faible et multicolin avec Gr.Liv.Area ( une variable est consideree comme il faut enlever quand meme car VIF >3) mais on a hypothese garder Gr.liv.area
+
+
+```{r}
+(formula_new <- as.formula(paste("SalePrice ~ . - Half.Bath -", paste(significant_vars_GrLivArea, collapse = " - "))))
+reg5<- lm(formula_new, data = subset)
+summary(reg5)
+```
+
+
+
+
+
