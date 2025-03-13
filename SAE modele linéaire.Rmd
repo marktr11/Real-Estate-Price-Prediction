@@ -7,21 +7,103 @@ date: "2025-02-25"
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+L'objectif de cette étude du projet est de construire le meilleur modèle de régression multiple pour prédire le prix des maisons dans la ville d’Ames grâce aux caractéristiques données dans le dataset disponible ici avec le
+
+# Importation du jeu de données
+
+```{r include=FALSE}
+dataset = read.csv2("C:/Users/BUNICE/OneDrive - Université Côte d'Azur/Bureau/Semestre 4/Cours Modèle Linéaire/Projet Groupe/simplifiedAmesHousing.csv",stringsAsFactors = TRUE, header = TRUE,sep=";",dec=".")
+```  
+
+# Exploration du contenu du jeu données
 
 ```{r}
-dataset = read.csv2("C:/Users/BUNICE/OneDrive - Université Côte d'Azur/Bureau/Semestre 4/Cours Modèle Linéaire/Projet Groupe/simplifiedAmesHousing.csv",stringsAsFactors = TRUE, header = TRUE,sep=";",dec=".")
 str(dataset)
+skimr::skim(dataset)
+dplyr::glimpse(dataset)
 summary(dataset)
 ```
+Notre jeu de données contient 22 variables (dont 4 variables qualitatives et 18 quantitatives) pour 2930. Parmi les variables qualitatives, "Alley" (Type of alley access to property) semble contenir 2732 valeurs manquantes. Il s'agit d'une mauvaise interprétation de la modalité 'NA' (No alley access) de cette variable par R. D'ailleurs, il ne la compte pas comme étant une modalité. Cela devrait être corrigé dans la suite de nos analyses.
 
-## Import des library
+## Re-encodage des modalités de la variable "Alley"
 ```{r}
-library(ggplot2)
-library(dplyr)
-library(car)
+dataset$Alley<-factor(dataset$Alley,levels = c("Grvl", "Pave", "None")) # pour modifier les libelés des levels 
+
+# Remplacer NA de la colonne Alley par None 
+dataset$Alley[is.na(dataset$Alley)] <- "None"
+summary(dataset$Alley)
 ```
 
-## Quelques visualisations et interprétations
+# Vérification et traitement des valeurs manquantes
+
+```{r}
+# Compter les valeurs manquantes dans chaque colonne
+colSums(is.na(dataset))
+```
+Les variables quantitatives "Total.Bsmt.SF" (Total Basement Square Feet), "Basmt.Full.Bath" (Basement full bathrooms),  "Bsmt.Half.Bath" (Basement halh bathrooms), "Garage.Cars" et "Garage.Area" contiennent des valeurs manquantes. Un inspection plus approfondie des lignes correspondantes est necessaire.
+
+## Utiliser la régression pour imputer les valeurs manquantes
+```{r}
+# Liste des colonnes contenant des NA
+(cols_avec_na <- names(dataset)[colSums(is.na(dataset)) > 0])
+# indice des individus 
+for (col in cols_avec_na) { # boucle qui permet de d'indiquer les indices des NA
+  indice <- which(is.na(dataset[[col]]))  
+  print(indice)
+}
+```
+On remarque que les NA proviennent des observations 1342, 1498 et 2237. 
+
+```{r}
+dataset[c(1342,1498,2237),c("Order", "Total.Bsmt.SF",  "Bsmt.Full.Bath", "Bsmt.Half.Bath", "Garage.Cars","Garage.Area")]
+```
+
+Au lieu de retirer ces observations du jeu de données, remplacer les NA par 0 semble plus judicieux d'autant plus qu'il s'agit de variables quantitatives.
+
+```{r}
+# Remplacer les NA des colonnes concernées par 0 
+for (col in cols_avec_na) {
+  dataset[col][is.na(dataset[col])] <- 0  
+}
+dataset[c(1342,1498,2237),cols_avec_na]
+```
+
+
+```{r}
+colSums(is.na(dataset))
+
+```
+Dorénavant, notre jeu de données ne  contient plus aucune valeur manquantes.
+
+
+# Statistiques descriptives de notre variable d'intérêt : SalePrice
+
+```{r}
+summary(dataset$SalePrice)
+```
+Les prix des maisons varient entre $12789 et $755000. En moyenne, les maisons sont vendues à 180796 et sur toute la période, le prix médian est de 160000$. Visualisons la distribution des prix sur un graphique.
+
+```{r}
+hist(dataset$SalePrice, col = 'light blue', main = 'Distribution des prix des maisons', xlab = 'SalePrice', breaks = seq(0,800000,10000 ), xlim = c(0,800000), freq = FALSE)
+abline(v = mean(dataset$SalePrice), col = 'red', lty = 2, lwd = 3)
+abline(v = median(dataset$SalePrice), col = 'dark blue', lty = 2, lwd = 3)
+lines(density(dataset$SalePrice), col = 'black', lwd = 2)
+```  
+# Matrice des corrélations
+
+```{r}
+df <- dataset %>%
+  select_if(is.numeric)
+corrplot::corrplot(cor(df), type="upper", order="hclust", tl.col="black", method = "shade")
+```
+
+# Visualisation des corrélations avec les nuages de points
+
+```{r}
+display = x11()
+GGally::ggpairs(df)
+```
+
 ```{r}
 hist(dataset$Lot.Area, 
      main = "Répartition des tailles de maisons",
@@ -38,51 +120,6 @@ boxplot(dataset$Lot.Area)
 ## Corriger les types de variables
 ```{r}
 dataset$Overall.Qual<-as.factor(dataset$Overall.Qual)# typer la variable qualité en factor
-```
-
-## Traiter les données manquantes
-```{r}
-# Compter les valeurs manquantes dans chaque colonne
-colSums(is.na(dataset))
-```
-
-
-```{r}
-# modifier les levels d'abord
-dataset$Alley<-factor(dataset$Alley,levels = c("Grvl", "Pave", "None"))
-
-dataset$Total.Bsmt.SF<-as.numeric(dataset$Total.Bsmt.SF)
-# Remplacer NA  de la colonne Alley par None car n'etant pas des Not a Nomber d'aprés le description
-dataset$Alley[is.na(dataset$Alley)] <- "None"
-summary(dataset$Alley)
-
-```
-## Utiliser la régression pour imputer les valeurs manquantes
-```{r}
-
-# Liste des colonnes contenant des NA
-cols_avec_na <- names(dataset)[colSums(is.na(dataset)) > 0]
-print(cols_avec_na)
-# indice des individus 
-for (col in cols_avec_na) { # uen boucle qui permet de d'indiquer les indices des NA
-  indice <- which(is.na(dataset[[col]]))  
-  print(indice)
-}
-# on remarque les NA proviennent de 3 individus d'indice 1342,1498 et 2237
-
-#dataset[1342,]
-
-
-dataset_sans_na =na.omit(dataset)# 
-colSums(is.na(dataset_sans_na))
-
-```
-# Matrice des corrélations
-
-```{r}
-df <- dataset_sans_na %>%
-  select_if(is.numeric)
-corrplot::corrplot(cor(df), type="upper", order="hclust", tl.col="black", method = "shade")
 ```
 
 
