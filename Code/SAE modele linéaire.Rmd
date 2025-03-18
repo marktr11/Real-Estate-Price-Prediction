@@ -134,10 +134,11 @@ boxplot(dataset$SalePrice~dataset$MS.Zoning,notch=TRUE)
 
 ```{r}
 
-reg1 <- lm(SalePrice~.-Order, data = dataset_sans_na)
+reg1 <- lm(SalePrice~.-Order, data = dataset)
 summary(reg1)
 ```
 ```{r}
+library(car)
 vif(reg1)[,3]^2
 ```
 ```{r}
@@ -147,19 +148,19 @@ to_be_factors <- c("Overall.Qual", "Bsmt.Full.Bath", "Bsmt.Half.Bath", "Full.Bat
 
 dataset_sans_na[to_be_factors] <- lapply(dataset_sans_na[to_be_factors], factor)
 
-reg2 <- lm(SalePrice~.-Order, data = dataset_sans_na)
+reg2 <- lm(SalePrice~.-Order, data = dataset)
 vif(reg2)[, 3]^2
 ```
 ```{r}
-reg3 <- lm(SalePrice~.-Order-X1st.Flr.SF-X2nd.Flr.SF, data = dataset_sans_na)
+reg3 <- lm(SalePrice~.-Order-X1st.Flr.SF-X2nd.Flr.SF, data = dataset)
 vif(reg3)[, 3]^2
 ```
 ```{r}
-rg <- lm(Gr.Liv.Area~.-Order-MS.Zoning-Neighborhood-Year.Built, data = dataset_sans_na)
+rg <- lm(Gr.Liv.Area~.-Order-MS.Zoning-Neighborhood-Year.Built, data = dataset)
 summary(rg, digits = Inf)
 ```
 ```{r}
-reg4 <- lm(SalePrice~.-Order-X1st.Flr.SF-X2nd.Flr.SF-Garage.Area-Year.Built, data = dataset_sans_na)
+reg4 <- lm(SalePrice~.-Order-X1st.Flr.SF-X2nd.Flr.SF-Garage.Area-Year.Built, data = dataset)
 vif(reg4)[, 3]^2
 summary(reg4)
 ```
