@@ -12,7 +12,7 @@ L'objectif de cette étude du projet est de construire le meilleur modèle de r�
 # Importation du jeu de données
 
 ```{r include=FALSE}
-dataset = read.csv2("C:/Users/BUNICE/OneDrive - Université Côte d'Azur/Bureau/Semestre 4/Cours Modèle Linéaire/Projet Groupe/simplifiedAmesHousing.csv",stringsAsFactors = TRUE, header = TRUE,sep=";",dec=".")
+dataset = read.csv2("simplifiedAmesHousing.csv",stringsAsFactors = TRUE, header = TRUE, sep=";", dec=".")
 ```  
 
 # Exploration du contenu du jeu données
@@ -89,6 +89,9 @@ abline(v = mean(dataset$SalePrice), col = 'red', lty = 2, lwd = 3)
 abline(v = median(dataset$SalePrice), col = 'dark blue', lty = 2, lwd = 3)
 lines(density(dataset$SalePrice), col = 'black', lwd = 2)
 ```  
+
+Commentaire : 
+
 # Matrice des corrélations
 
 ```{r}
@@ -96,6 +99,7 @@ df <- dataset %>%
   select_if(is.numeric)
 corrplot::corrplot(cor(df), type="upper", order="hclust", tl.col="black", method = "shade")
 ```
+Commentaire : 
 
 # Visualisation des corrélations avec les nuages de points
 
@@ -103,6 +107,7 @@ corrplot::corrplot(cor(df), type="upper", order="hclust", tl.col="black", method
 display = x11()
 GGally::ggpairs(df)
 ```
+Commentaire : 
 
 ```{r}
 hist(dataset$Lot.Area, 
@@ -122,13 +127,13 @@ boxplot(dataset$Lot.Area)
 dataset$Overall.Qual<-as.factor(dataset$Overall.Qual)# typer la variable qualité en factor
 ```
 
-
 ## boxplot de la cible en fonction de 
 
 ```{r}
 plot(SalePrice~., data = dataset)
 boxplot(dataset$SalePrice~dataset$MS.Zoning,notch=TRUE)
 ```
+Commentaire :
 
 # vif
 
@@ -141,6 +146,10 @@ summary(reg1)
 library(car)
 vif(reg1)[,3]^2
 ```
+Commentaire :
+
+# Encodage pertinent des variables ordinales pour voir l'impact sur la régression et les vif
+
 ```{r}
 to_be_factors <- c("Overall.Qual", "Bsmt.Full.Bath", "Bsmt.Half.Bath", "Full.Bath", 
                    "Half.Bath", "TotRms.AbvGrd", "Garage.Cars",
@@ -150,24 +159,33 @@ dataset_sans_na[to_be_factors] <- lapply(dataset_sans_na[to_be_factors], factor)
 
 reg2 <- lm(SalePrice~.-Order, data = dataset)
 vif(reg2)[, 3]^2
-```
+``` 
+Commentaire :
+
 ```{r}
 reg3 <- lm(SalePrice~.-Order-X1st.Flr.SF-X2nd.Flr.SF, data = dataset)
 vif(reg3)[, 3]^2
-```
+```  
+Commentaire :
+
 ```{r}
 rg <- lm(Gr.Liv.Area~.-Order-MS.Zoning-Neighborhood-Year.Built, data = dataset)
 summary(rg, digits = Inf)
 ```
+Commentaire :
+
 ```{r}
 reg4 <- lm(SalePrice~.-Order-X1st.Flr.SF-X2nd.Flr.SF-Garage.Area-Year.Built, data = dataset)
 vif(reg4)[, 3]^2
 summary(reg4)
 ```
+Commentaire :
+
 ```{r}
 reg5 <- lm(SalePrice~.-Order-Gr.Liv.Area, data = dataset_sans_na)
 vif(reg5)[, 3]^2
-```
+```  
+Commentaire :
 
 # Stepwise (prédictif)
 
@@ -175,14 +193,16 @@ vif(reg5)[, 3]^2
 reg_wise <- MASS::stepAIC(reg4, direction = "both")
 vif(reg_wise)[,3]^2
 ```  
+Commentaire :
 
 # method "exhaustive"
 
 ```{r}
-reg_exhau <- leaps::regsubsets(SalePrice~., data = dataset_sans_na, method = "exhaustive", nvmax = ncol(dataset_sans_na), really.big = T) # Un souci ici
+reg_exhau <- leaps::regsubsets(SalePrice~.-Order-X1st.Flr.SF-X2nd.Flr.SF-Garage.Area-Year.Built, data = dataset, method = "exhaustive", nvmax = ncol(dataset), really.big = T) # Un souci ici
 summary(reg_exhau)
 plot(reg_exhau, scale = "bic")
 ```
+Commentaire :
 
 ```{r}
 reg_final <- lm(SalePrice ~ MS.Zoning + Lot.Area + Alley + Neighborhood + Overall.Qual + 
@@ -191,5 +211,14 @@ reg_final <- lm(SalePrice ~ MS.Zoning + Lot.Area + Alley + Neighborhood + Overal
     Garage.Cars + Sale.Condition, data = dataset_sans_na)
 
 summary(reg_final)
-```
+```  
+Commmentaire :
+
+```{r}
+plot(reg_final, c(1:5))
+```  
+
+Commentaire :
+
+suite... ?
 
