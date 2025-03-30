@@ -1,4 +1,4 @@
-# Projet de Prédiction des Prix de Maisons
+# Prédiction des Prix de Maisons avec R
 
 ## Description du Projet
 L'objectif de ce projet est de construire **le meilleur modèle de régression multiple** pour prédire le prix des maisons dans la ville d'Ames à partir des caractéristiques fournies dans le dataset.
