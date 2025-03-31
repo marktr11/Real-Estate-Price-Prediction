@@ -1,87 +1,88 @@
 ---
-title: "SAE modéle linéaire"
-output: word_document
-date: "2025-02-25"
+title: "SAE modéle linéaire - Projet sur le dataset House Prices Ames"
+author: "Theturus GOUDAN, Serigne DIOP, Binh Minh TRAN"
+date: "2025-03-29"
+output:
+  pdf_document:
+    latex_engine: xelatex  # Recommandé pour une meilleure gestion des polices
+    includes:
+      in_header: header.tex  # Fichier LaTeX pour personnalisation
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+library(ggplot2)
+library(plotly)
+library(car)
+library(MASS)
+library(dplyr)
 ```
-L'objectif de cette étude du projet est de construire le meilleur modèle de régression multiple pour prédire le prix des maisons dans la ville d’Ames grâce aux caractéristiques données dans le dataset disponible ici House Prices - Advanced Regression Techniques | Kaggle.
+
+L'objectif de cette étude du projet est de construire le meilleur modèle de régression multiple pour prédire le prix des maisons dans la ville d’Ames grâce aux caractéristiques données dans le dataset disponible sur Kaggle à l'adresse House Prices - Advanced Regression Techniques | Kaggle.
 
 # Importation du jeu de données et chargement des librairies
 
 ```{r include=FALSE}
 dataset = read.csv2("C:/Users/BUNICE/OneDrive - Université Côte d'Azur/Bureau/Semestre 4/Cours Modèle Linéaire/Projet Groupe/simplifiedAmesHousing.csv",stringsAsFactors = TRUE, header = TRUE,sep=";",dec=".")
-
-library(dplyr)
-library(ggplot2)
-library(car)
-library(MASS)
 ```    
 
-# Exploration du contenu du jeu données
+# Exploration du contenu du jeu données et traitement
 
 ```{r}
 skimr::skim(dataset)
 ```
 
-Notre jeu de données contient 22 variables (dont 4 variables qualitatives et 18 quantitatives) pour 2930. Parmi les variables qualitatives, "Alley" (Type of alley access to property) semble contenir 2732 valeurs manquantes. Il s'agit d'une mauvaise interprétation de la modalité 'NA' (No alley access) de cette variable par R. D'ailleurs, il ne la compte pas comme étant une modalité. Cela devrait être corrigé dans la suite de nos analyses.
+Notre jeu de données contient 22 variables (dont 4 variables qualitatives et 18 quantitatives) pour 2930 observations. Parmi les variables qualitatives, "Alley" (Type of alley access to property) semble contenir 2732 valeurs manquantes. Il s'agit d'une mauvaise interprétation de la modalité 'NA' (No alley access) de cette variable par R. D'ailleurs, il ne la compte pas comme étant une modalité. Cela devrait être corrigé dans la suite de nos analyses.
 
-## Re-encodage des modalités de la variable "Alley" en codant les 'NA' en 'No_Alley' et coversion de Overall.Qual en factors
+## Re-encodage des modalités de la variable "Alley" en codant les 'NA' en 'No_Alley' et conversion de Overall.Qual en factor
 
 ```{r}
 dataset$Alley<- factor(dataset$Alley, levels = c("Grvl", "Pave", "No_Alley")) # pour modifier les libelés des levels 
 
-# Remplacer NA de la colonne Alley par No_Alley 
-
-dataset$Alley[is.na(dataset$Alley)] <- "No_Alley"
+dataset$Alley[is.na(dataset$Alley)] <- "No_Alley" # pour remplacer NA de la colonne Alley par No_Alley
 summary(dataset$Alley)
 
 dataset$Overall.Qual <- as.factor(dataset$Overall.Qual)
 ```
 
-# Vérification et traitement des valeurs manquantes
+## Vérification et traitement des valeurs manquantes
 
 ```{r}
-# Compter les valeurs manquantes dans chaque colonne
 colSums(is.na(dataset))
 ```
-Les variables quantitatives "Total.Bsmt.SF" (Total Basement Square Feet), "Basmt.Full.Bath" (Basement full bathrooms),  "Bsmt.Half.Bath" (Basement halh bathrooms), "Garage.Cars" et "Garage.Area" contiennent des valeurs manquantes. Un inspection plus approfondie des lignes correspondantes est necessaire.
+Les variables quantitatives "Total.Bsmt.SF" (Total Basement Square Feet), "Basmt.Full.Bath" (Basement full bathrooms),  "Bsmt.Half.Bath" (Basement halh bathrooms), "Garage.Cars" et "Garage.Area" contiennent des valeurs manquantes. Une inspection plus approfondie des lignes correspondantes est nécessaire.
 
 ## Inspection des lignes avec NA
 
 ```{r}
-# Liste des colonnes contenant des NA
-(cols_avec_na <- names(dataset)[colSums(is.na(dataset)) > 0])
-# indice des individus 
+(cols_avec_na <- names(dataset)[colSums(is.na(dataset)) > 0]) # liste des colonnes contenant des NA
+ 
 for (col in cols_avec_na) { # boucle qui permet d'indiquer les indices des NA
   indice <- which(is.na(dataset[[col]]))  
   print(indice)
 }
 ```
-On remarque que les NA proviennent des observations 1342, 1498 et 2237. 
+On remarque que les NA proviennent principalement des observations 1342, 1498 et 2237. Visualisons ces lignes dans le dataset.
 
 ```{r}
 dataset[c(1342,1498,2237),c("Order", "Total.Bsmt.SF",  "Bsmt.Full.Bath", "Bsmt.Half.Bath", "Garage.Cars","Garage.Area")]
 ```
 
-Au lieu de retirer ces observations du jeu de données, remplacer les NA par 0 semble plus judicieux d'autant plus qu'il s'agit de variables quantitatives.
+Au lieu de retirer ces observations du jeu de données, remplacer les NA par 0 semble plus judicieux d'autant plus qu'il s'agit de variables quantitatives. Procédons :
 
 ```{r}
-# Remplacer les NA des colonnes concernées par 0 
 for (col in cols_avec_na) {
   dataset[col][is.na(dataset[col])] <- 0  
 }
 dataset[c(1342,1498,2237),cols_avec_na]
 ```
-## Vérifions à nouveau les NA dans le dataset
+- Vérifions à nouveau les NA dans le dataset
 
 ```{r}
 colSums(is.na(dataset))
-
 ```
-Dorénavant, notre jeu de données ne  contient plus aucune valeur manquantes.
+Dorénavant, notre jeu de données ne contient plus aucune valeur manquante.
 
 
 # Statistiques descriptives de notre variable d'intérêt : SalePrice
@@ -97,7 +98,7 @@ abline(v = mean(dataset$SalePrice), col = 'red', lty = 2, lwd = 3)
 abline(v = median(dataset$SalePrice), col = 'dark blue', lty = 2, lwd = 3)
 lines(density(dataset$SalePrice), col = 'black', lwd = 2)
 ```  
-On constate que la distribution des prix de vente a une queue plus longue sur la droite (courbe étalée à droite). La distribution de SalePrice est donc positivement asymétrique. Dans l'idéal, nous voudrions que la variable dépendante ait une distribution normale et dans ce cas, une alternative judicieuse pourrait être de la transformer et de prendre son logarithme. Une comparaison du modèle avec la cible prise comme telle et son log sera donc effectuée. À présent, voyons les corrélations entre les variables explicatives (quantitatives) et SalePrice.  
+On constate que la distribution des prix de vente a une queue plus longue sur la droite (courbe étalée à droite). La distribution de SalePrice est donc positivement asymétrique. Dans l'idéal, nous voudrions que la variable dépendante ait une distribution normale et dans ce cas, une alternative judicieuse pourrait être de la transformer et de prendre son logarithme. Une comparaison du modèle avec la cible prise comme telle et son log sera donc effectuée.  
 
 ```{r}
 hist(log(dataset$SalePrice), col = 'light blue', main = 'Distribution des prix des maisons', xlab = 'SalePrice', freq = FALSE)
@@ -106,18 +107,20 @@ abline(v = median(dataset$SalePrice), col = 'dark blue', lty = 2, lwd = 3)
 lines(density(log(dataset$SalePrice)), col = 'black', lwd = 2)
 ```
 
+En appliquent le log à SalePrice, l'asymétrie de la distribution des prix est corrigée et la courbe de densité semble suivre une loi normale centré autour de 12. À présent, voyons les corrélations entre les variables explicatives (quantitatives) et SalePrice.  
+
 
 # Matrice des corrélations
 
 ```{r}
-library(dplyr)
 df <- dataset %>%
   select_if(is.numeric)
-corrplot::corrplot(cor(df), type="upper", order="hclust", tl.col="black", method = "shade", addCoef.col = "black")
+corrplot::corrplot(cor(df), type="upper", order="hclust", tl.col="black", method = "shade")
 ```  
 
-Les variables Full.Bath, Gr.Liv.Area, TotRms.AbvGrd,  X1st.Flr.SF, Total.Bsmt.SF, Garage.Cars, Garage.Area, Year.Built et Year.Remod.Add sont les plus corrélées (rho > 0.5) avec SalePrice. Les variables comme Lot.Area, Bsmt.Full.Bath, Half.Bath et X2nd.Flr.SF sont plus ou moins corrélées avec SalePrice également, mais faiblement. Quant à Yr.Sold et Bsmt.Half.Bath, le coefficient de correlation linéaire est presque nulle. Etant donné que l'immobilier est considéré comme stable sur toutale la période, la variable Yr.Sold n'est pas vraiment d'intérêt pour la modélisation encore moins compte tenu de sa faible corrélation avec SalePrice. Quant à Bsmt.Half.Bath, on décide de la conserver pour le moment. Approfondissons un peu plus les relations entre SalePrice avec quelques variables explicatives dont les coefficients de corrélation sont les plus élevés.
+Les variables Full.Bath, Gr.Liv.Area, TotRms.AbvGrd,  X1st.Flr.SF, Total.Bsmt.SF, Garage.Cars, Garage.Area, Year.Built et Year.Remod.Add sont les plus corrélées (rho > 0.5) avec SalePrice. Les variables comme Lot.Area, Bsmt.Full.Bath, Half.Bath et X2nd.Flr.SF sont plus ou moins corrélées avec SalePrice également, mais faiblement. Quant à Yr.Sold et Bsmt.Half.Bath, le coefficient de correlation linéaire est presque nulle. Etant donné que l'immobilier est considéré comme stable sur toute la période, la variable Yr.Sold n'est pas vraiment d'intérêt pour la modélisation encore moins compte tenu de sa faible corrélation avec SalePrice. Quant à Bsmt.Half.Bath, on décide de la conserver pour le moment. Approfondissons un peu plus les relations entre SalePrice avec quelques variables explicatives dont les coefficients de corrélation sont les plus élevés ainsi que Overall.Qual.
 
+-Overall.Qual  
 
 ```{r}
 tab_croise <- aggregate(SalePrice ~ Overall.Qual, data = dataset, FUN = median, na.action = na.omit)
@@ -130,10 +133,11 @@ ggplotly(ggplot(tab_croise, aes(x = Overall.Qual, y = SalePrice, fill = Overall.
 
 Comme on pouvait s'y attendre, le prix médian de vente des maisons croit de façon significative avec la qualité globale du matériau général et de la finition de la maison.  
 
+- Lot.Area
 
 ```{r}
 hist(dataset$Lot.Area, 
-     main = "Répartition des tailles de maisons",
+     main = "Répartition des tailles des maisons",
      xlab = "Surface du terrain (Lot.Area)",
      ylab = "Fréquence",
      col = "skyblue",
@@ -141,27 +145,31 @@ hist(dataset$Lot.Area,
 ```  
 
 
-On voit que la répartition de la taille des maisons reste homogène (compris entre 0 et 25000 Feet Square), mais avec quelques exceptions. Il pourrait être intéressant de discrétiser cette variable en deux classes, mais avant ça identifions les maisons qui font l'exception.  
+On voit que la répartition de la taille des maisons reste homogène (compris entre 0 et 25000 Feet Square), mais avec quelques exceptions. Il pourrait être intéressant de discrétiser cette variable en deux classes, mais avant ça identifions les maisons qui font l'exception.   
 
-```{r}
+
+```{r, echo=TRUE, results='hide'}
 high_lot <- (dataset$Lot.Area > 25000)
 dataset[high_lot, ]
 ```  
 
-Il y a au total 48 maisons avec un Lot.Area au-dessus des 25000 sqaure feet. Elles majoritairement situées dans une zone Residential Low Density avec un Overall.Qual d'au moins 5. 
+Il y a au total 48 maisons avec un Lot.Area au-dessus des 25000 square feet. Elles sont majoritairement situées dans une zone Residential Low Density (RL) avec un Overall.Qual d'au moins 5.   
+
+- Gr.Liv.Area
 
 ```{r}
+print(paste("Le coefficient de corrélation linéaire vaut : ", cor(dataset$Gr.Liv.Area, dataset$SalePrice)))
 plot(data = dataset, SalePrice~Gr.Liv.Area, main = "Nuage de points de SalePrice en fonction de Gr.Liv.Area")
 ```  
 
 La relation linéaire positive entre les deux variables est assez nette (comme en témoigne le coefficient de corrélation linéaire). On remarque quand même que les surfaces habitables des maisons sont concentrées entre 0 et 4000 square feet. Certaines maisons font quand même l'exception sauf que pour 3 d'entre elles, la relation linéaire positive entre SalePrice et Gr.Liv.Area n'est pas avérée. Voyons les maisons concernées et ce qui fait leurs différences.  
 
-```{r}
+```{r, echo=TRUE, results='hide'}
 (maison_out <- which(dataset$Gr.Liv.Area > 4000))
 dataset[maison_out,]
 ```    
 
-L'inspection des différentes caractéristiques des 5 maisons atypiques, révèle une certaine incohérence. Les 5 maisons appartiennent toutes à la même zone (MS Zoning) avec un même Overall.Qual (= 10) et des caractéristiques immobilières plus ou moins semblables. Le seul point différenciant est relative à Lot.Area où les trois maisons avec les plus grands Lot.Area (enregistrements 1499 et 2181 et 2182) sont inversement celles qui ont un SalePrice faible (beaucoup moins élevé par rapport à celui des deux autres). La variable Lot.Area étant (faiblement) corrélée positivement avec SalePrice, une différence entre les surfaces ne devrait pas valoir un si grand écart entre les prix encore moins les faire décroître quand Lot.Area est très élevé 
+L'inspection des différentes caractéristiques des 5 maisons atypiques, révèle une certaine incohérence. Les 5 maisons appartiennent toutes à la même zone (RL) avec un même Overall.Qual (= 10) et des caractéristiques immobilières plus ou moins semblables. Le seul point différenciant est relative à Lot.Area où les trois maisons avec les plus grands Lot.Area (enregistrements 1499 et 2181 et 2182) sont inversement celles qui ont un SalePrice faible (beaucoup moins élevé par rapport à celui des deux autres). La variable Lot.Area étant (faiblement) corrélée positivement avec SalePrice, une différence entre les surfaces ne devrait pas valoir un si grand écart entre les prix encore moins les faire décroître quand Lot.Area est très élevé.
 
 La variation de SalePrice est-elle due aux conditions de ventes (Sale.Condition) ? Voyons la moyenne des prix en fonction de cette variable.
 
@@ -171,11 +179,12 @@ tab_croise2 <- aggregate(SalePrice ~ Sale.Condition, data = dataset, FUN = mean,
 
 ggplotly(ggplot(tab_croise2, aes(x = Sale.Condition, y = SalePrice, fill = Sale.Condition)) +
   geom_bar(stat = "identity") +
-  labs(title = "Médiane de SalePrice par SaleCondition", x = "Sale.Condition", y = "SalePrice moyen") +
+  labs(title = "Médiane de SalePrice en fonction de Sale.Condition", x = "Sale.Condition", y = "SalePrice moyen") +
   theme_minimal())
 ```  
 
-Les maisons vendues dans des conditions correspondantes à la modalité Partial (ome was not completed when last assessed (associated with New Homes)) sont en moyenne les plus chers avec un prix moyen de 273374.4, ce qui reste quelque peu supérieur aux prix de vente des trois maisons des lignes 1499, 2181 et 2182. Mettons l'accent sur la qualité globale du matériau général et de la finition de la maison.   
+
+Les maisons vendues dans des conditions correspondantes à la modalité Partial (Home was not completed when last assessed (associated with New Homes)) sont en moyenne les plus chers avec un prix moyen de 273374.4, ce qui reste quelque peu supérieur aux prix de vente des trois maisons des lignes 1499, 2181 et 2182. Mettons l'accent sur la qualité globale du matériau général et de la finition de la maison.   
 
 
 ```{r}
@@ -199,7 +208,7 @@ dataset %>%
 On constate que le prix minimum de vente pour des maisons de même qualité (Overall.Qual = 10), de la même zone (MS.Zoning = "RL"), mais avec des caractéristiques immobilières (Lot.Area, Gr.liv.Area, etc) moins intéressantes que les 3 maisons atypiques est 385000, ce qui est largement au-dessus de leur prix de vente. Cela met en évidence l'incohérence relative aux prix de vente de ces 3 maisons. Nous allons retirer ces trois lignes du dataset pour éviter l'effet de ces variabilités qui semblent être du bruit (variabilité sans intérêt).
 
 ```{r}
-dataset <- dataset[-c(1499, 2181, 2182)]
+dataset <- dataset[-c(1499, 2181, 2182),]
 ```
 
 
@@ -208,8 +217,8 @@ dataset <- dataset[-c(1499, 2181, 2182)]
 ```{r}
 
 var_cat <- dataset %>%
-  select(where(~ !is.numeric(.))) %>%
-  select(-starts_with("Y")) %>%
+  select_if(~ !is.numeric(.)) %>%
+  select(-Overall.Qual) %>%
   names()
 
 
@@ -218,12 +227,15 @@ for (var in var_cat) {
           main = paste("SalePrice en fonction de", var), 
           xlab = var, 
           ylab = "SalePrice", 
-          col = "lightblue", 
+          col = "green", 
           notch = TRUE,
           varwidth = TRUE)
  # points(dataset$SalePrice ~ dataset[[var]], col = "red")
 }
 ```   
+
+- L'analyse des différents boxplots montrent des intervalles de confiances sur certains prix médians conditionnels de vente des maisons qui se recoupent, indiquant prix semblables entre les groupes pour chaque facteur. Faisons directement une ANOVA pour chacun de ces facteurs pour nous assurer qu'ils ont un effet significatif sur la variable cible et si oui, quelques sont les moyennes conditionnelles qui sont significativement différentes.
+
 
 # ANOVA 
 
@@ -231,27 +243,26 @@ for (var in var_cat) {
 for (var in var_cat){
   cat("ANOVA - ", var, "\n")
   print(summary(aov(SalePrice~dataset[[var]], data = dataset)))
-  cat("\n")
+  cat("\n\n")
 }
 ```   
 
-Au seuil de 5%, toutes les quatre variables ont une influence significative (très forte significativité) sur le prix de vente des maisons (car les p-values associées à l'ANOVA de SalePrice en fonction de chacune d'elle sont inférieures à 0.05). Elles restent donc pertinentes pour une prédiction des prix de ventes des maisons. Testons pour chaque variable, les moyennes conditionnes qui différent des autres et vérifions les hypothèses de chaque modèle. 
+Au seuil de 5%, toutes les quatre variables ont une influence significative (très forte significativité (***)) sur le prix de vente des maisons (les p-values associées à l'ANOVA de SalePrice en fonction de chacune d'elle sont inférieures à 0.05). Elles restent donc pertinentes pour une prédiction des prix de ventes des maisons. Testons pour chaque variable, les moyennes conditionnes qui différent des autres et vérifions les hypothèses de chaque modèle. 
 
 
-```{r}
+```{r, echo=TRUE, results='hide'}
 p <- list()
 for (var in var_cat){
   cat("TurkeyHSD - ", var, "\n")
   print(TukeyHSD(aov(SalePrice~dataset[[var]], data = dataset)))
   cat("\n")
-  plot(TukeyHSD(aov(SalePrice~dataset[[var]], data = dataset)))
 }
 
 ```  
 
 - MS.Zoning
 
-La p-value du test d'égalité des moyennes des prix de ventes entre C (all)-A (agr), I (all)-A (agr), I (all)-C (all), RH-A (agr), RH-C (all),  RH-I (all), RL-A (agr), RL-I (all), RM-A (agr), RM-I (all), I (all)-FV, et est supérieure à 5%. Donc au seuil 5%, les prix des maisons situées dans les zones commerciales, agricoles, industrielles et résidentielles haute densité ne sont pas significativement différents. Il en est de même pour les maisons situées entre les zones agricoles, industrielles et résidentielles moyennes densité ainsi que celles situées entre les zones résidentielles faible densité, industrielles et agricoles. 
+La p-value du test d'égalité des moyennes des prix de ventes entre C (all)-A (agr), I (all)-A (agr), I (all)-C (all), RH-A (agr), RH-C (all),  RH-I (all), RL-A (agr), RL-I (all), RM-A (agr), RM-I (all) et I (all)-FV est supérieure à 0.05. Donc au seuil 5%, les prix des maisons situées dans les zones commerciales, agricoles, industrielles et résidentielles haute densité ne sont pas significativement différents. Il en est de même pour les maisons situées entre les zones agricoles, industrielles et résidentielles moyennes densité (RM) ainsi que celles situées entre les zones résidentielles faible densité (RL), industrielles et agricoles. 
 
 On pourra de ce fait, regrouper par exemple les maisons situées dans les zones commerciales (C), agricoles (A) et industrielles (I) ensemble, celles situées dans les zones résidentielles haute (RH) et moyenne densité (RM) ensemble et garder toutes les autres (FV, RL) seules. Voyons tout ça un peu plus clairement avec le graphique du test de TukeyHSD.
 
@@ -259,23 +270,23 @@ On pourra de ce fait, regrouper par exemple les maisons situées dans les zones 
 tukey_result <- TukeyHSD(aov(SalePrice ~ MS.Zoning, data = dataset))
 plot(tukey_result, las = 1)
 ```  
-Cette démarche reste assez plausible. Nous comparerons les résultats avec un modèle sans ce type de regroupement.
+Notre démarche de regrouper certaines zones reste alors assez plausible. Nous comparerons les résultats avec un modèle sans ce type de regroupement pour justifier de la pertinence.
 
 - Alley   
 
-La p-value du test d'égalité des moyennes des prix de ventes des maisons avec une allée en gravier et des maisons sans allées est supérieur à 0.05 et donc au seuil 5%, ces types de maisons ont en moyenne des prix égaux. 
+La p-value du test d'égalité des moyennes des prix de ventes des maisons avec une allée en gravier (Grvl) et des maisons sans allées (No_Alley) est supérieure à 0.05 et donc au seuil 5%, ces types de maisons ont en moyenne des prix semblables, ce qui n'est pas du tout le cas pour les maisons avec une allée pavée (Pave). 
 
 ```{r}
 tukey_result2 <- TukeyHSD(aov(SalePrice ~ Alley, data = dataset))
 plot(tukey_result2, las = 1)
 ```  
 
-Comme on peut le constater sur le graphique, ici également, on peut envisager un regroupement des modalités No_Alley et Grvl en une modalité.  
+Comme on peut le constater sur le graphique, ici également, on peut envisager un regroupement des modalités No_Alley et Grvl en une modalité, mais la faible représentativé ou plûtôt la forte représentativité des maison sans allée peut poser problème.  
 
 
 - Sale.Condition  
 
-La p-value du test d'égalité des moyennes des prix de ventes entre AdjLand-Abnorml, Alloca-Abnorml, Family-Abnorml, Family-AdjLand, Alloca-AdjLand, Family-Alloca, Normal-Alloca  et Normal-Family est supérieure à 0.05. De fait, au seuil 5% l'hypothèse nulle d'égalité des prix moyens pour ces modalités de Sale.Condition, 
+La p-value du test d'égalité des moyennes des prix de ventes entre AdjLand-Abnorml, Alloca-Abnorml, Family-Abnorml, Family-AdjLand, Alloca-AdjLand, Family-Alloca, Normal-Alloca  et Normal-Family est supérieure à 0.05. De fait, au seuil 5%, on ne pourra pas rejeter l'hypothèse nulle d'égalité des prix moyens pour ces modalités de Sale.Condition. À l'inverse les prix pour Normal et Partial sont significativement différent;
 
 ```{r}
 tukey_result2 <- TukeyHSD(aov(SalePrice ~ Sale.Condition, data = dataset))
@@ -285,7 +296,9 @@ plot(tukey_result2, las = 1)
 On constate au vu des résultats du test et du graphique qu'il peut-être intéressant de regrouper les maisons vendues en AdjLand, en Family, Alloca, Abnorml. Les autres variables seront gardées seules.  
 
 
-## Vérification des hypothèses du test
+## Vérification des hypothèses du test  
+
+Créeons une boucle pour automatiser la réalisation des tests pour chaque facteur
 
 ```{r}
 
@@ -301,12 +314,12 @@ for (var in var_cat) {
   cat("Hypothèses du modèle ANOVA - ", var, "\n\n")
   
   if (valide) {
-  # 1. Normalité des espérances conditionnelles
+   
   cat("- Normalité des espérances conditionnelles\n")
   shapiro_results <- tapply(dataset$SalePrice, dataset[[var]], shapiro.test)
   print(shapiro_results)
   
-  # Vérifier si au moins une p-value est < 0.05
+  # Vérifions si au moins une p-value est < 0.05
   p_values <- sapply(shapiro_results, function(x) x$p.value)
   if (any(p_values < 0.05)) {
     cat("\nAu moins une p-value est inférieure à 0.05, on rejette l'hypothèse nulle de normalité des lois conditionnelles.\n")
@@ -368,7 +381,7 @@ for (var in var_cat) {
   
 ```
 
-- Pour toutes les quatre variables, aucune des hypothèses du test n'est vérifiée. Confirmons cela par une inspection graphique
+- Pour toutes les quatre variables, aucune des hypothèses du test n'est vérifiée. Confirmons cela par une inspection graphique.
 
 ```{r}
 for (var in var_cat){
@@ -405,11 +418,11 @@ prix_qt <- dataset %>%
             N = n()) %>%
   ungroup()
 
-# Mmatrice de données pour le clustering 
+# Matrice de données pour le clustering 
 clustering <- prix_qt$PrixMoyen
 names(clustering) <- prix_qt$Neighborhood
 
-# Matrice de dissimilarité (distance euclidienne)
+# Matrice de distance
 dist_matrix <- dist(clustering, method = "euclidean")
 
 # Clustering hiérarchique avec la méthode "complete" 
@@ -419,8 +432,7 @@ hc <- hclust(dist_matrix, method = "complete")
 plot(hc, main = "Dendrogramme des quartiers basé sur le prix moyen", 
      xlab = "Neighborhood", ylab = "Distance")
 
-# Choix des clusters basé sur une différence maximale de 10000 USD entre les prix moyens 
-nb_clusterss <- 7 
+# Choix des clusters basé sur une différence maximale de 5000 USD entre les prix moyens 
 clusters <- cutree(hc, h = 5000)
 
 # Complètons le summarize avec les clusters
@@ -428,18 +440,19 @@ prix_qt$Cluster <- clusters
 print(prix_qt)
 
 ```
+- Nous obtenons au final 17 clusters avec une distance maximale de 5000 USD entre les prix moyens. Cela reste assez intéressant pour le modèle comparativement au nombre de modalités initiales de Neighborhood. 
 
 
-# Intégration de toutes les modifications suggérées dans notre jeu de données 
+# Intégration de toutes les modifications suggérées dans une copie du jeu de données 
 
-```{r}
-
-# Complètons le dataset avec la colonne clusters 
+```{r, echo=TRUE, results='hide'}
 dataset_2 <- dataset
+
+# Complètons le dataset avec la colonne clusters
 dataset_2$Cluster_Nei <- clusters[match(dataset_2$Neighborhood, prix_qt$Neighborhood)]
 dataset_2$Cluster_Nei <- factor(dataset_2$Cluster_Nei)
 
-# Vérification : Statistiques par cluster
+# Statistiques par cluster
 print(dataset_2 %>%
   group_by(Cluster_Nei) %>%
   summarise(MedianSalePrice = median(SalePrice, na.rm = TRUE),
@@ -460,16 +473,6 @@ cat("SaleConditionG\n")
 print(table(dataset_2$Sale.ConditionG))
 
 
-# Alley
-
-#dataset_2$AlleyG <- as.character(dataset_2$Alley)
-#dataset_2$AlleyG[dataset_2$Alley == "No_Alley" | dataset_2$Alley == "Grvl"] <- "NoAGrvl"
-#dataset_2$AlleyG[dataset_2$Alley == "Pave"] <- "Pave"
-#dataset_2$AlleyG <- factor(dataset_2$AlleyG)
-
-#cat("\nAlleyG\n")
-#print(table(dataset_2$AlleyG))
-
 # MS.Zoning
 dataset_2$MS.ZoningG <- as.character(dataset_2$MS.Zoning)
 dataset_2$MS.ZoningG[dataset_2$MS.Zoning %in% c("C (all)", "A (agr)", "I (all)")] <- "Comm_Agr_Ind"
@@ -485,22 +488,31 @@ print(table(dataset_2$MS.ZoningG))
 
 ```  
 
-## Visualisation des regroupements
+
+## Vérification des corespondances des différents quartiers avec les clusters et visualisation des regroupements
 
 ```{r}
+cluster_quartiers <- dataset_2 %>%
+  group_by(Cluster_Nei) %>%
+  summarise(Neighborhoods = paste(unique(Neighborhood), collapse = ", ")) %>%
+  arrange(Cluster_Nei)
+
+print("Correspondance entre les clusters et les quartiers :")
+print(cluster_neighborhoods)
 
 
 boxplot(SalePrice ~ Sale.ConditionG, data = dataset_2, notch = TRUE, varwidth = TRUE, 
         main = "SalePrice par Sale.ConditionG", col = "lightblue")
-#boxplot(SalePrice ~ AlleyG, data = dataset_2, notch = TRUE, varwidth = TRUE, 
-        # main = "SalePrice par AlleyG", col = "lightgreen")
+
 boxplot(SalePrice ~ MS.ZoningG, data = dataset_2, notch = TRUE, varwidth = TRUE, 
         main = "SalePrice par MS.ZoningG", col = "lightyellow")
+
 boxplot(SalePrice ~ Cluster_Nei, data = dataset_2, notch = TRUE, varwidth = TRUE, 
         main = "SalePrice par Cluster_Nei", col = "lightpink")
 ```
 
-- Les groupes semblent bien distincts maintenant. Testons cela à l'aide du test de KrusKal-Walis
+- Les groupes semblent bien distincts maintenant. Testons cela à l'aide du test de KrusKal-Walis.  
+
 
 ```{r}
 dataset_2 <- dataset_2 %>%
@@ -518,13 +530,14 @@ for (var in var_gr) {
   cat("\n")
 }
 ```  
-- Toutes les p-values sont inférieures à 0.05, les médianes entre les groupes sont significativement ou globalement différentes
+- Toutes les p-values sont inférieures à 0.05, les médianes entre les groupes sont significativement ou globalement différentes.
 
 
-# Analyse de la multicolinéarité
+# Analyse de la multicolinéarité avant la régression multiple
 
+Avant tout, convertissons dans des types appropriés les variables Bsmt.Full.Bath, Year.Built, etc.
 
-## Encodage pertinent des variables ordinales pour voir l'impact sur la régression et les vif
+## Encodage pertinent des variables ordinales et nominales avant de vérifier les vif et la régression
 
 ```{r}
 to_be_factors <- c("Bsmt.Full.Bath", "Bsmt.Half.Bath", "Full.Bath", 
@@ -579,13 +592,13 @@ total.SF <- dataset_2$Gr.Liv.Area+dataset_2$Total.Bsmt.SF
 dataset_2 <- dataset_2 %>% 
   mutate(total.SF)
 
-reg4 <- lm(SalePrice~.-Order-X1st.Flr.SF-X2nd.Flr.SF-Gr.Liv.Area-Total.Bsmt.SF-Garage.Area, data = dataset)
-vif(reg4)[, 3]^2
+reg5 <- lm(SalePrice~.-Order-X1st.Flr.SF-X2nd.Flr.SF-Gr.Liv.Area-Total.Bsmt.SF-Garage.Area, data = dataset)
+vif(reg5)[, 3]^2
 
 cat("\n\n")
 
-reg5 <- lm(SalePrice~.-Order-X1st.Flr.SF-X2nd.Flr.SF-Gr.Liv.Area-Total.Bsmt.SF-Garage.Area, data = dataset_2)
-vif(reg5)[, 3]^2
+reg6 <- lm(SalePrice~.-Order-X1st.Flr.SF-X2nd.Flr.SF-Gr.Liv.Area-Total.Bsmt.SF-Garage.Area, data = dataset_2)
+vif(reg6)[, 3]^2
 ```    
 
 ```{r}
@@ -597,18 +610,77 @@ summary(lm(total.SF~MS.ZoningG, data = dataset_2))
 
 
 ```{r}
-regAIC <- stepAIC(reg4, direction ="both")
+regAIC <- stepAIC(reg5, direction ="both")
 summary(regAIC)
 vif(regAIC)[, 3]^2
 ```  
 
 
 ```{r}
-reg2AIC <- stepAIC(reg5, direction ="both")
+reg2AIC <- stepAIC(reg6, direction ="both")
 summary(reg2AIC)
 vif(reg2AIC)[, 3]^2
 ```
 
 
+```{r}
+plot(regAIC, 4)
+```  
 
+```{r}
+plot(reg2AIC, 4)
+```
+
+
+
+```{r}
+regAIC_f <- stepAIC(lm(SalePrice~.-Order-X1st.Flr.SF-X2nd.Flr.SF-Gr.Liv.Area-Total.Bsmt.SF-Garage.Area, data = dataset[-c(45,1183,1768),]), direction ="both")
+summary(regAIC_f)
+vif(regAIC_f)[, 3]^2
+```   
+
+
+```{r}
+reg2AIC_f <- stepAIC(lm(SalePrice~.-Order-X1st.Flr.SF-X2nd.Flr.SF-Gr.Liv.Area-Total.Bsmt.SF-Garage.Area, data = dataset_2[-c(45,1183,1768),]), direction ="both")
+summary(reg2AIC_f)
+vif(reg2AIC_f)[, 3]^2
+```
+
+
+# Validation des hypothèses du modèle linéaire et choix du meilleur modèle
+
+- Modèle avec données sans regroupement des clases avec total.SF.Liv.Area
+
+```{r}
+shapiro.test(regAIC_f$residuals)
+```  
+
+```{r}
+skedastic::white(regAIC_f)
+```
+
+```{r}
+plot(regAIC_f, 1:3)
+```
+
+- Modèle avec regroupement des clases et total.SF.Liv.Area
+
+```{r}
+shapiro.test(regAIC_f$residuals)
+```  
+
+```{r}
+skedastic::white(regAIC_f)
+```
+
+```{r}
+plot(regAIC_f, 1:3)
+```
+
+# Choix du meilleur modèle suivant l'AIC
+
+```{r}
+AIC(regAIC_f) 
+AIC(reg2AIC_f)
+```
 
